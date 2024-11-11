@@ -30,9 +30,7 @@ pipeline {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', passwordVariable: 'DOCKER_HUB_PASSWORD', usernameVariable: 'DOCKER_HUB_USERNAME')]) {
                     sh 'echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin'
-                    def repoName = 'samplereactapp'
-                    def buildTag = "ratneshpuskar/${repoName}:${env.BUILD_NUMBER}"
-                    sh "docker push ${buildTag}"
+                    sh "docker push ratneshpuskar/samplereactapp:${env.BUILD_NUMBER}"
                 }
             }
         }
