@@ -1,91 +1,88 @@
 pipeline {
     agent any
-
-    tools { 
+    tools {
         nodejs "NodeJS"
     }
-
     stages {
-        stage('Checkout Code') {
+        stage('Checkout') {
             steps {
                 git branch: 'main', url: 'https://github.com/SakthiSiddhu/SampleReactApp'
             }
         }
-        stage('Build Project') {
+        stage('Build') {
             steps {
-                sh 'npm install'
-                sh 'npm run build --skip-tests'
+                sh 'npm install --production'
             }
         }
-        stage('Create Docker Image') {
+        stage('Docker Build') {
             steps {
                 script {
-                    def repoName = "samplereactapp"
-                    def buildTag = "ratneshpuskar/${repoName}:${env.BUILD_NUMBER}"
-                    sh "docker build -t ${buildTag} ."
-                }
-            }
-        }
-        stage('Push Docker Image') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', passwordVariable: 'DOCKER_HUB_PASSWORD', usernameVariable: 'DOCKER_HUB_USERNAME')]) {
-                    sh 'echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin'
-                    sh "docker push ratneshpuskar/samplereactapp:${env.BUILD_NUMBER}"
+                    def imageName = "ratneshpuskar/samplereactapp:${env.BUILD_NUMBER}"
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', passwordVariable: 'dockerHubPassword', usernameVariable: 'dockerHubUsername')]) {
+                        sh '''
+                            docker build -t ${imageName} .
+                            echo "${dockerHubPassword}" | docker login -u "${dockerHubUsername}" --password-stdin
+                            docker push ${imageName}
+                        '''
+                    }
                 }
             }
         }
         stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    def repoName = 'samplereactapp'
-                    def buildTag = "ratneshpuskar/${repoName}:${env.BUILD_NUMBER}"
-                    writeFile file: 'deployment.yaml', text: """
-                      apiVersion: apps/v1
-                      kind: Deployment
-                      metadata:
-                        name: ${repoName}
-                      spec:
+                    def deploymentYaml = """
+                    apiVersion: apps/v1
+                    kind: Deployment
+                    metadata:
+                        name: samplereactapp
+                    spec:
                         replicas: 1
                         selector:
-                          matchLabels:
-                            app: ${repoName}
+                            matchLabels:
+                                app: samplereactapp
                         template:
-                          metadata:
-                            labels:
-                              app: ${repoName}
-                          spec:
-                            containers:
-                            - name: ${repoName}
-                              image: ${buildTag}
-                              ports:
-                              - containerPort: 3000
+                            metadata:
+                                labels:
+                                    app: samplereactapp
+                            spec:
+                                containers:
+                                - name: samplereactapp
+                                  image: ratneshpuskar/samplereactapp:${env.BUILD_NUMBER}
+                                  ports:
+                                  - containerPort: 5000
                     """
-                    writeFile file: 'service.yaml', text: """
-                      apiVersion: v1
-                      kind: Service
-                      metadata:
-                        name: ${repoName}
-                      spec:
-                        type: NodePort
-                        ports:
-                        - port: 3000
-                          nodePort: 30007
+
+                    def serviceYaml = """
+                    apiVersion: v1
+                    kind: Service
+                    metadata:
+                        name: samplereactapp
+                    spec:
                         selector:
-                          app: ${repoName}
+                            app: samplereactapp
+                        ports:
+                        - protocol: TCP
+                          port: 5000
+                          targetPort: 5000
+                          nodePort: 30007
+                    type: NodePort
                     """
-                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@65.1.86.218 "kubectl apply -f -" < deployment.yaml'
-                    sh 'ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@65.1.86.218 "kubectl apply -f -" < service.yaml'
+
+                    sh """
+                        ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@3.109.185.68 "kubectl apply -f -" <<< "${deploymentYaml}"
+                        ssh -i /var/test.pem -o StrictHostKeyChecking=no ubuntu@3.109.185.68 "kubectl apply -f -" <<< "${serviceYaml}"
+                    """
                 }
             }
         }
     }
-
     post {
         success {
-            echo 'Deployment completed successfully!'
+            echo 'Pipeline succeeded.'
         }
         failure {
-            echo 'Deployment failed.'
+            echo 'Pipeline failed.'
         }
     }
 }
