@@ -21,7 +21,7 @@ pipeline {
                         sh """
                             docker build -t ratneshpuskar/samplereactapp:${env.BUILD_NUMBER} .
                             echo "${dockerHubPassword}" | docker login -u "${dockerHubUsername}" --password-stdin
-                            docker push ${imageName}
+                            docker push ratneshpuskar/samplereactapp:${env.BUILD_NUMBER}
                         """
                     }
                 }
