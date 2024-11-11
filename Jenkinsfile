@@ -20,7 +20,7 @@ pipeline {
         stage('Create Docker Image') {
             steps {
                 script {
-                    def repoName = 'samplereactapp'.toLowerCase()
+                    def repoName = "samplereactapp"
                     def buildTag = "ratneshpuskar/${repoName}:${env.BUILD_NUMBER}"
                     sh "docker build -t ${buildTag} ."
                 }
