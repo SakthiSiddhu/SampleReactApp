@@ -17,13 +17,12 @@ pipeline {
         stage('Docker Build') {
             steps {
                 script {
-                    def imageName = "ratneshpuskar/samplereactapp:${env.BUILD_NUMBER}"
                     withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', passwordVariable: 'dockerHubPassword', usernameVariable: 'dockerHubUsername')]) {
-                        sh '''
-                            docker build -t ${imageName} .
+                        sh """
+                            docker build -t ratneshpuskar/samplereactapp:${env.BUILD_NUMBER} .
                             echo "${dockerHubPassword}" | docker login -u "${dockerHubUsername}" --password-stdin
                             docker push ${imageName}
-                        '''
+                        """
                     }
                 }
             }
